@@ -8,6 +8,14 @@ namespace ConsoleMinecraftLauncher;
 
 static class Program
 {
+    public static List<Account> Accounts = new();
+
+    public static readonly ILogger Logger = LoggerFactory
+        .Create(config => { config.AddProvider(NullLoggerProvider.Instance); })
+        .CreateLogger("CML");
+
+    public static List<Java> Javas = new();
+    
     static DirectoryInfo? SubDirectoryOrNull(this DirectoryInfo directory, params string[] name)
     {
         if (!directory.Exists)
@@ -67,12 +75,6 @@ static class Program
         return "";
     }
 
-    public static List<Account> Accounts = new();
-
-    public static readonly ILogger Logger = LoggerFactory
-        .Create(config => { config.AddProvider(NullLoggerProvider.Instance); })
-        .CreateLogger("CML");
-
     public static void Main(string[] args)
     {
         if (!Directory.Exists("accounts"))
@@ -92,8 +94,7 @@ static class Program
             {
             }
         }
-
-        Java java = new Java("java");
+        
         var dir = new DirectoryInfo(GetOfficialMinecraftPath());
         List<string> javaPath = new();
         if (OperatingSystem.IsMacOS())
@@ -122,7 +123,7 @@ static class Program
                 .FlatMap()
                 .Where(x => x is not null && x.Exists)
                 .ToList()
-                .ForEach(x => javaPath.Add(x.FullName));
+                .ForEach(x => javaPath.Add(x!.FullName));
         }
 
         var path = (Environment.GetEnvironmentVariable("PATH") ?? "")
@@ -138,8 +139,17 @@ static class Program
             .FlatMap();
         foreach (var j in path)
         {
-            Console.WriteLine(j);
+            try
+            {
+                Javas.Add(new Java(j));
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, "Failed to load java");
+            }
         }
+        
+        Javas.ForEach(java => Console.WriteLine($"{java.Path} {java.MajorVersion}.{java.MinorVersion}"));
 
         if (dir.Exists)
         {
@@ -148,7 +158,5 @@ static class Program
         {
             dir.Create();
         }
-
-        Console.WriteLine($"Default java version is {java.MajorVersion}.{java.MinorVersion}");
     }
 }

@@ -17,6 +17,7 @@ public class Account
 
     public Type type;
     public string name;
+    internal string accessToken = "";
     public State state = State.Unverified;
 
     /// <summary>

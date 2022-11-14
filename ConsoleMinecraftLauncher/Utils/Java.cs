@@ -37,14 +37,15 @@ public class Java
         Process verProcess = Process.Start(new ProcessStartInfo()
         {
             FileName = path,
-            Arguments = "--version",
+            Arguments = "-version",
             CreateNoWindow = true,
             UseShellExecute = false,
-            RedirectStandardOutput = true
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
         }) ?? throw new InvalidOperationException("Failed to get java version!");
         verProcess.Start();
         verProcess.WaitForExit();
-        string versionString = verProcess.StandardOutput.ReadToEnd();
+        string versionString = verProcess.StandardOutput.ReadToEnd() + verProcess.StandardError.ReadToEnd();
         versionString = Regex.Match(versionString, "\\d+\\.\\d+").Value;
         MajorVersion = Convert.ToInt32(versionString[..versionString.IndexOf('.')]);
         MinorVersion = Convert.ToInt32(versionString[(versionString.IndexOf('.') + 1)..]);
