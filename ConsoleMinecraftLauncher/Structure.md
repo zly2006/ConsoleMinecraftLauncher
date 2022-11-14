@@ -1,0 +1,3 @@
+Program.cs: 暂时写在这里了很多逻辑，它目前的功能是查找java和mc版本，读取LaunchSettings，加载Accounts，并负责console的渲染工作
+Account是对账户对封装，支持离线、微软登陆、皮肤站
+Launcher是启动用对，Program里面new出来然后调用Launch

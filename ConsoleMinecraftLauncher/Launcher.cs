@@ -1,13 +1,39 @@
 using System.Diagnostics;
+using ConsoleMinecraftLauncher.Utils;
+using Microsoft.Extensions.Logging;
+using Version = System.Version;
 
 namespace ConsoleMinecraftLauncher;
 
+/// <summary>
+/// 
+/// </summary>
 public class Launcher
 {
+    /// <summary>
+    /// The minecraft client
+    /// </summary>
     private readonly FileInfo _jar;
+    /// <summary>
+    /// Selected account
+    /// </summary>
     private readonly Account _account;
+    /// <summary>
+    /// Launch mc in which directory (for version isolation)
+    /// </summary>
     private readonly DirectoryInfo _gameDir;
+    /// <summary>
+    /// Setting for this version
+    /// </summary>
     private readonly LaunchSettings _settings;
+    /// <summary>
+    /// The version of this minecraft. The <see cref="Utils.Version"/> class includes mc version, mod loader type, mc type, etc.
+    /// </summary>
+    private Utils.Version _minecraftVersion;
+    /// <summary>
+    /// true if you want to ignore warnings.
+    /// </summary>
+    public bool ForceLaunch { get; set; } = false;
 
     public Launcher(FileInfo jar, Account account, DirectoryInfo gameDir, LaunchSettings settings)
     {
@@ -27,10 +53,18 @@ public class Launcher
         }
     }
 
-    public Process? Launch()
+    public Process? Launch(Java java)
     {
-        CommandBuilder builder = new("java");
-        if (!_account.Login())
+        if (!ForceLaunch && java.FitMinecraftVersion(_minecraftVersion))
+        {
+            Console.Write("Warning: your java version is too new/out of date for the mc version, launch anyway? (y/N)");
+            if (Console.ReadKey().Key != ConsoleKey.Y)
+            {
+                return null;
+            }
+        }
+        CommandBuilder builder = new(java.Path);
+        if (!_account.Refresh())
         {
             return null;
         }

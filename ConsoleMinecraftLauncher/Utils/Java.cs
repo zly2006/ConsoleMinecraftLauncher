@@ -15,7 +15,14 @@ public class Java
         {
             throw new Exception("Not Minecraft!");
         }
-
+        if (version.Type == Version.VersionType.Other)
+        {
+            return true;
+        }
+        if (version.Type != Version.VersionType.Full && version.Type != Version.VersionType.Snapshot)
+        {
+            return false;
+        }
         return version.Minor switch
         {
             < 17   => MinorVersion is >= 8 and < 17,
@@ -38,7 +45,7 @@ public class Java
         verProcess.Start();
         verProcess.WaitForExit();
         string versionString = verProcess.StandardOutput.ReadToEnd();
-        versionString = Regex.Match(versionString, "\\d\\.\\d").Value;
+        versionString = Regex.Match(versionString, "\\d+\\.\\d+").Value;
         MajorVersion = Convert.ToInt32(versionString[..versionString.IndexOf('.')]);
         MinorVersion = Convert.ToInt32(versionString[(versionString.IndexOf('.') + 1)..]);
         if (MajorVersion != 1)
