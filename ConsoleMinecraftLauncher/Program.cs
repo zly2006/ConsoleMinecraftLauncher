@@ -1,4 +1,5 @@
-﻿using ConsoleMinecraftLauncher.Utils;
+﻿using System.Reflection.Metadata;
+using ConsoleMinecraftLauncher.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -125,7 +126,35 @@ static class Program
                 .ToList()
                 .ForEach(x => javaPath.Add(x!.FullName));
         }
-
+        if (OperatingSystem.IsWindows())
+        {
+            List<string> drivePath = new();
+            DriveInfo[] driveInfos = DriveInfo.GetDrives();
+            foreach (var item in driveInfos)
+            {
+                drivePath.Add(item.Name+"Program Files\\Java");
+                drivePath.Add(item.Name+"Program Files\\java");
+                drivePath.Add(item.Name+"Program Files(x86)\\Java");
+                drivePath.Add(item.Name+"Program Files(x86)\\java");
+                drivePath.Add(item.Name+"\\Java");
+                drivePath.Add(item.Name+"\\java");
+            }
+            drivePath.Select(x => new DirectoryInfo(x))
+                     .Where(x => x.Exists)
+                     .Select(path 
+                         => path.GetDirectories().Select(x => new[]
+                             {
+                                 x.SubDirectoryOrNull("Contents", "Home", "bin"),
+                                 x.SubDirectoryOrNull("Contents", "Home", "jre", "bin")
+                             }
+                             .Where(x => x is not null && x.Exists)
+                     ).FlatMap()
+                             .Where(x => x is not null && x.Exists))
+                     .FlatMap()
+                     .Where(x => x is not null && x.Exists)
+                     .ToList()
+                     .ForEach(x => javaPath.Add(x!.FullName));
+        }
         var path = (Environment.GetEnvironmentVariable("PATH") ?? "")
             .Split(':')
             .Concat(javaPath)
