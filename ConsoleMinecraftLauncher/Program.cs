@@ -3,6 +3,8 @@ using ConsoleMinecraftLauncher.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Console;
+using Microsoft.Extensions.Options;
 using static System.Environment.SpecialFolder;
 
 namespace ConsoleMinecraftLauncher;
@@ -12,11 +14,19 @@ static class Program
     public static List<Account> Accounts = new();
 
     public static readonly ILogger Logger = LoggerFactory
-        .Create(config => { config.AddProvider(NullLoggerProvider.Instance); })
+        .Create(config =>
+        {
+            var configureNamedOptions = new ConfigureNamedOptions<ConsoleLoggerOptions>("", null);
+            var optionsFactory = new OptionsFactory<ConsoleLoggerOptions>(new []{ configureNamedOptions }, Enumerable.Empty<IPostConfigureOptions<ConsoleLoggerOptions>>());
+            var optionsMonitor = new OptionsMonitor<ConsoleLoggerOptions>(optionsFactory, Enumerable.Empty<IOptionsChangeTokenSource<ConsoleLoggerOptions>>(), new OptionsCache<ConsoleLoggerOptions>());
+            config.AddProvider(new ConsoleLoggerProvider(optionsMonitor));
+        })
         .CreateLogger("CML");
 
     public static List<Java> Javas = new();
-    
+
+    public static List<MinecraftClient> Clients = new();
+
     static DirectoryInfo? SubDirectoryOrNull(this DirectoryInfo directory, params string[] name)
     {
         if (!directory.Exists)
@@ -78,6 +88,7 @@ static class Program
 
     public static void Main(string[] args)
     {
+        
         if (!Directory.Exists("accounts"))
         {
             Directory.CreateDirectory("accounts");
@@ -96,7 +107,7 @@ static class Program
             }
         }
         
-        var dir = new DirectoryInfo(GetOfficialMinecraftPath());
+        var minecraftDir = new DirectoryInfo(GetOfficialMinecraftPath());
         List<string> javaPath = new();
         if (OperatingSystem.IsMacOS())
         {
@@ -126,7 +137,7 @@ static class Program
                 .ToList()
                 .ForEach(x => javaPath.Add(x!.FullName));
         }
-        if (OperatingSystem.IsWindows())
+        else if (OperatingSystem.IsWindows())
         {
             List<string> drivePath = new();
             DriveInfo[] driveInfos = DriveInfo.GetDrives();
@@ -155,8 +166,33 @@ static class Program
                      .ToList()
                      .ForEach(x => javaPath.Add(x!.FullName));
         }
-        var path = (Environment.GetEnvironmentVariable("PATH") ?? "")
-            .Split(':')
+        else if (OperatingSystem.IsLinux())
+        {
+            new DirectoryInfo[]
+                {
+                    new("/usr/java"),
+                    new("/usr/lib/jvm"),
+                    new("/usr/lib32/jvm")
+                }
+                .Where(x => x.Exists)
+                .Select(x =>
+                    x.GetDirectories()
+                        .Select(dir => Path.Combine(dir.FullName, "bin", "java"))
+                        .Where(File.Exists))
+                .FlatMap()
+                .ToList()
+                .ForEach(x => javaPath.Add(x));
+        }
+        else
+        {
+            Logger.LogError("Unsupported OS");
+            return;
+        }
+
+        Console.WriteLine("Loading java...");
+        (Environment.GetEnvironmentVariable("PATH") ?? "")
+            // in windows, path separator is ';'
+            .Split(OperatingSystem.IsWindows() ? ';' : ':')
             .Concat(javaPath)
             .Where(x => x != "")
             .Select(x => new DirectoryInfo(x))
@@ -165,27 +201,52 @@ static class Program
                 .Where(file => file.Name == "java")
                 .Select(file => file.FullName)
             )
-            .FlatMap();
-        foreach (var j in path)
-        {
-            try
+            .FlatMap()
+            .Select<string, Action>(p =>
             {
-                Javas.Add(new Java(j));
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e, "Failed to load java");
-            }
-        }
-        
-        Javas.ForEach(java => Console.WriteLine($"{java.Path} {java.MajorVersion}.{java.MinorVersion}"));
+                return () =>
+                {
+                    try
+                    {
+                        var java = new Java(p);
+                        Javas.Add(java);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.LogWarning(e, "Failed to load java");
+                        throw;
+                    }
+                };
+            })
+            .Select(Task.Run)
+            .ToList()
+            .ForEach(task => task.Wait());
 
-        if (dir.Exists)
+        Console.WriteLine($"Loaded {Javas.Count} java executables!");
+        foreach (var java in Javas)
+            Console.WriteLine($"{java.Path} {java.MajorVersion}.{java.MinorVersion}");
+
+        if (minecraftDir.Exists)
         {
+            var configDir = minecraftDir.SubDirectoryOrNull(".cml") ?? minecraftDir.CreateSubdirectory(".cml");
+            var accountsDir = configDir.SubDirectoryOrNull("accounts") ?? configDir.CreateSubdirectory("accounts");
+            var versionDir = minecraftDir.SubDirectoryOrNull("versions") ?? minecraftDir.CreateSubdirectory("versions");
+            foreach (var directory in versionDir.GetDirectories())
+            {
+                if (File.Exists(Path.Combine(directory.FullName, directory.Name + ".json")))
+                {
+                    var jsonFile = new FileInfo(Path.Combine(directory.FullName, directory.Name + ".json"));
+                    Clients.Add(new MinecraftClient(jsonFile, new LaunchSettings(), minecraftDir));
+                }
+            }
         }
         else
         {
-            dir.Create();
+            minecraftDir.Create();
         }
+
+        MicrosoftLogin login = new();
+        var password = Account.ReadPassword();
+        while (true) { }
     }
 }

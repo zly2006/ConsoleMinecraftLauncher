@@ -66,12 +66,17 @@ public class CommandBuilder
         return builder.ToString();
     }
 
-    public Process? Start()
+    public Process? Start(bool useShellExecute)
     {
         return Process.Start(new ProcessStartInfo()
         {
             FileName = _target,
-            Arguments = BuildArgs()
+            Arguments = BuildArgs(),
+            UseShellExecute = useShellExecute,
+            RedirectStandardError = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            CreateNoWindow = true
         });
     }
 }
