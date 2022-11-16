@@ -7,7 +7,8 @@ public class Java
 {
     public string Path { get; set; }
     public int MajorVersion { get; set; }
-    public int MinorVersion { get; set; }
+    public string VersionString { get; set; }
+    public int Arch { get; set; }
 
     public bool FitMinecraftVersion(Version version)
     {
@@ -25,9 +26,9 @@ public class Java
         }
         return version.Minor switch
         {
-            < 17   => MinorVersion is >= 8 and < 17,
-            17     => MinorVersion == 16,
-            >= 18  => MinorVersion >= 17,
+            < 17   => MajorVersion is >= 8 and < 17,
+            17     => MajorVersion == 16,
+            >= 18  => MajorVersion >= 17,
         };
     }
 
@@ -37,7 +38,7 @@ public class Java
         Process verProcess = Process.Start(new ProcessStartInfo()
         {
             FileName = path,
-            Arguments = "-version",
+            Arguments = "-XshowSettings -version",
             CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardOutput = true,
@@ -45,15 +46,15 @@ public class Java
         }) ?? throw new InvalidOperationException("Failed to get java version!");
         verProcess.Start();
         verProcess.WaitForExit();
-        string versionString = verProcess.StandardOutput.ReadToEnd() + verProcess.StandardError.ReadToEnd();
-        versionString = Regex.Match(versionString, "\\d+\\.\\d+").Value;
-        MajorVersion = Convert.ToInt32(versionString[..versionString.IndexOf('.')]);
-        MinorVersion = Convert.ToInt32(versionString[(versionString.IndexOf('.') + 1)..]);
-        if (MajorVersion != 1)
+        var output = verProcess.StandardOutput.ReadToEnd() + verProcess.StandardError.ReadToEnd();
+        VersionString = Regex.Match(output, "java\\.version\\s*=\\s*\"?(?<version>[0-9]+\\.[0-9]+\\.[0-9]+_?[0-9]*)").Groups["version"].Value;
+        var arch = Regex.Match(output, "sun\\.arch\\.data\\.model\\s*=\\s*([0-9]+)").Groups[1].Value;
+        Arch = Convert.ToInt32(arch);
+        MajorVersion = Convert.ToInt32(VersionString.Split('.')[0]);
+        var minor = Convert.ToInt32(VersionString.Split('.')[1]);
+        if (MajorVersion == 1)
         {
-            MinorVersion = MajorVersion;
-            MajorVersion = 1;
-            // 1.7 1.8 1.18, etc
+            MajorVersion = minor;
         }
     }
 }

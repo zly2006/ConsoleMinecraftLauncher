@@ -214,7 +214,6 @@ static class Program
                     catch (Exception e)
                     {
                         Logger.LogWarning(e, "Failed to load java");
-                        throw;
                     }
                 };
             })
@@ -224,7 +223,7 @@ static class Program
 
         Console.WriteLine($"Loaded {Javas.Count} java executables!");
         foreach (var java in Javas)
-            Console.WriteLine($"{java.Path} {java.MajorVersion}.{java.MinorVersion}");
+            Console.WriteLine($"{java.Path} {java.MajorVersion}({java.VersionString}, {java.Arch} bit)");
 
         if (minecraftDir.Exists)
         {
